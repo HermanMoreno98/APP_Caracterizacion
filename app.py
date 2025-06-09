@@ -428,71 +428,18 @@ def obtener_df_prestador_simple(codigo_prestador, token, campos, nombres_columna
 
     return df
 
-# Modificar la función get_token para manejar ambos entornos
+# Modificar la función get_token para usar device code flow en producción
 def get_token():
-    try:
-        print("\n=== Iniciando obtención de token ===")
-        
-        # Verificar si estamos en Render
-        is_production = os.environ.get("RENDER") == "true"
-        print(f"🌍 Entorno: {'Producción (Render)' if is_production else 'Desarrollo (Local)'}")
-        
-        # Verificar variables de entorno según el entorno
-        if is_production:
-            if not all([TENANT_ID, CLIENT_ID, CLIENT_SECRET, RESOURCE]):
-                raise ValueError("En producción se requieren todas las variables de entorno")
-        else:
-            if not all([TENANT_ID, CLIENT_ID, RESOURCE]):
-                raise ValueError("Faltan variables de entorno necesarias para la autenticación")
-            
-        print("✅ Variables de entorno verificadas")
-        print(f"🔐 Tenant ID: {TENANT_ID[:5]}...")
-        print(f"👤 Client ID: {CLIENT_ID[:5]}...")
-        print(f"🌐 Resource: {RESOURCE}")
-        
-        if is_production:
-            # Usar autenticación con credenciales en producción
-            print("🔒 Usando autenticación con credenciales de cliente")
-            app = ConfidentialClientApplication(
-                CLIENT_ID,
-                authority=AUTHORITY,
-                client_credential=CLIENT_SECRET
-            )
-            result = app.acquire_token_for_client(scopes=SCOPE)
-        else:
-            # Usar autenticación interactiva en desarrollo
-            print("🔑 Usando autenticación interactiva")
-            app = PublicClientApplication(
-                CLIENT_ID,
-                authority=AUTHORITY
-            )
-            
-            # Intentar obtener el token del caché primero
-            accounts = app.get_accounts()
-            if accounts:
-                print("📝 Intentando usar token en caché...")
-                result = app.acquire_token_silent(SCOPE, account=accounts[0])
-            else:
-                result = None
-                
-            if not result:
-                print("🔄 Solicitando autenticación interactiva...")
-                result = app.acquire_token_interactive(scopes=SCOPE)
-            
-        if "access_token" not in result:
-            error_msg = f"❌ Error al obtener token: {result.get('error_description', 'Sin descripción del error')}"
-            print(error_msg)
-            raise Exception(error_msg)
-            
-        print("✅ Token obtenido exitosamente")
-        return result["access_token"]
-        
-    except Exception as e:
-        print(f"❌ Error en get_token: {str(e)}")
-        import traceback
-        print("📋 Traceback completo:")
-        print(traceback.format_exc())
-        raise
+    app = ConfidentialClientApplication(
+        CLIENT_ID,
+        authority=AUTHORITY,
+        client_credential=CLIENT_SECRET
+    )
+    scopes = [f"{RESOURCE}/.default"]
+    
+    # Obtener token
+    result = app.acquire_token_for_client(scopes=scopes)
+    return result["access_token"]
 
 def get_token_sharepoint():
     app = ConfidentialClientApplication(
