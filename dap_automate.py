@@ -1,3 +1,10 @@
+# Flask y dependencias web
+from flask import Flask, render_template, send_file, redirect, url_for
+
+# Crear la aplicación Flask
+app = Flask(__name__)
+
+# Resto de importaciones
 import pandas as pd
 from docxtpl import DocxTemplate, InlineImage, RichText
 import glob
@@ -33,15 +40,6 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-from flask import Flask, render_template, send_file, redirect, url_for
-import requests
-from msal import PublicClientApplication
-import pandas as pd
-import os
-from docxtpl import DocxTemplate
-
-
-
 import os
 import shutil
 import atexit
@@ -62,8 +60,6 @@ import atexit
 ############################################# II. Filtrando un prestador #############################################
 ######################################################################################################################
 
-
-app = Flask(__name__)
 
 # Configuración Dataverse
 
