@@ -2,7 +2,8 @@
 from flask import Flask, render_template, send_file, redirect, url_for
 
 # Crear la aplicación Flask
-app = Flask(__name__)
+application = Flask(__name__)
+app = application
 
 # Resto de importaciones
 import pandas as pd

@@ -3,7 +3,7 @@ services:
     name: sunass-informe-caracterizacion
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: PYTHONPATH=$PYTHONPATH:$(pwd) gunicorn wsgi:app
+    startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.12
