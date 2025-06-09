@@ -12,3 +12,6 @@ requests
 msal
 flask
 python-dotenv
+glob3
+datetime
+urllib3

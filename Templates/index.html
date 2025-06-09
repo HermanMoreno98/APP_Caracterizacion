@@ -1,68 +1,260 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Prestadores</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUNASS - Sistema de Informes de Caracterización</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        table {
-            border-collapse: collapse;
+        :root {
+            --sunass-primary: #005CA9;
+            --sunass-secondary: #00A0DC;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .navbar {
+            background-color: var(--sunass-primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand img {
+            height: 40px;
+            margin-right: 10px;
+        }
+
+        .card {
+            border: none;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+            border-radius: 10px;
+        }
+
+        .card-header {
+            background-color: white;
+            border-bottom: 2px solid #f0f0f0;
+            padding: 1.5rem;
+        }
+
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table th {
+            border-top: none;
+            background-color: #f8f9fa;
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .search-input {
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 12px;
             width: 100%;
+            transition: all 0.2s;
         }
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border: 1px solid #ddd;
+
+        .search-input:focus {
+            border-color: var(--sunass-secondary);
+            box-shadow: 0 0 0 0.2rem rgba(0, 160, 220, 0.25);
+            outline: none;
         }
+
+        .btn-download {
+            background-color: var(--sunass-primary);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-download:hover {
+            background-color: var(--sunass-secondary);
+            transform: translateY(-1px);
+        }
+
         .pagination {
-            margin-top: 10px;
+            margin-top: 1rem;
+            margin-bottom: 0;
         }
-        button {
-            padding: 5px 10px;
+
+        .page-link {
+            color: var(--sunass-primary);
+            padding: 0.5rem 1rem;
         }
-        input[type="text"] {
-            width: 90%;
-            margin-top: 4px;
+
+        .page-link:hover {
+            color: var(--sunass-secondary);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .stats-card {
+            transition: all 0.3s;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .footer {
+            background-color: #343a40;
+            color: white;
+            padding: 1rem 0;
+            margin-top: 2rem;
         }
     </style>
 </head>
 <body>
-    <h1>Lista de Prestadores</h1>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/f/ff/LOGO_SUNASS.png" alt="SUNASS">
+                Sistema de Informes de Caracterización
+            </a>
+        </div>
+    </nav>
 
-    <table>
-        <thead>
-            <tr>
-                <th>
-                    Código de Prestador<br>
-                    <input type="text" id="filtroCodigo" placeholder="Buscar...">
-                </th>
-                <th>
-                    Fecha<br>
-                    <input type="text" id="filtroFecha" placeholder="Buscar...">
-                </th>
-                <th>Descargar Informe</th>
-            </tr>
-        </thead>
-        <tbody id="prestador-body">
-            <!-- Contenido generado por JS -->
-        </tbody>
-    </table>
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h3 class="card-title text-primary" id="total-prestadores">0</h3>
+                        <p class="card-text text-muted">Total de Prestadores</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h3 class="card-title text-info" id="ultima-actualizacion">-</h3>
+                        <p class="card-text text-muted">Última Actualización</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="pagination">
-        <button onclick="paginaAnterior()">◀ Anterior</button>
-        <span id="pagina-indicador">Página 1</span>
-        <button onclick="paginaSiguiente()">Siguiente ▶</button>
+        <!-- Main Card -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Lista de Prestadores</h5>
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary" onclick="exportarExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Exportar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>
+                                    Código de Prestador
+                                    <input type="text" class="search-input mt-2" id="filtroCodigo" placeholder="Buscar por código...">
+                                </th>
+                                <th>
+                                    Fecha de Registro
+                                    <input type="text" class="search-input mt-2" id="filtroFecha" placeholder="Buscar por fecha...">
+                                </th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="prestador-body">
+                            <!-- Contenido generado por JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="d-flex align-items-center">
+                        <select class="form-select me-2" id="porPaginaSelect" style="width: auto;">
+                            <option value="10">10 por página</option>
+                            <option value="20" selected>20 por página</option>
+                            <option value="50">50 por página</option>
+                            <option value="100">100 por página</option>
+                        </select>
+                        <span class="text-muted" id="total-registros"></span>
+                    </div>
+                    <nav>
+                        <ul class="pagination mb-0">
+                            <li class="page-item">
+                                <button class="page-link" onclick="paginaAnterior()">
+                                    <i class="bi bi-chevron-left"></i>
+                                </button>
+                            </li>
+                            <li class="page-item">
+                                <span class="page-link" id="pagina-indicador">Página 1</span>
+                            </li>
+                            <li class="page-item">
+                                <button class="page-link" onclick="paginaSiguiente()">
+                                    <i class="bi bi-chevron-right"></i>
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-4">
+        <div class="container text-center">
+            <p class="mb-0">© 2024 SUNASS - Superintendencia Nacional de Servicios de Saneamiento</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
         const data = {{ data | tojson | safe }};
-        const porPagina = 20;
+        let porPagina = 20;
         let paginaActual = 1;
         let filtrados = data;
 
         const inputCodigo = document.getElementById("filtroCodigo");
         const inputFecha = document.getElementById("filtroFecha");
+        const porPaginaSelect = document.getElementById("porPaginaSelect");
 
+        // Event Listeners
         inputCodigo.addEventListener("input", aplicarFiltros);
         inputFecha.addEventListener("input", aplicarFiltros);
+        porPaginaSelect.addEventListener("change", function() {
+            porPagina = parseInt(this.value);
+            paginaActual = 1;
+            renderPagina();
+        });
+
+        // Actualizar estadísticas
+        document.getElementById("total-prestadores").textContent = data.length;
+        document.getElementById("ultima-actualizacion").textContent = new Date().toLocaleDateString();
 
         function aplicarFiltros() {
             const cod = inputCodigo.value.toLowerCase();
@@ -84,17 +276,18 @@
             const cuerpo = visibles.map(item => `
                 <tr>
                     <td>${item.cr217_codigodeprestador}</td>
-                    <td>${item.createdon}</td>
-                    <td>
-                        <a href="/download/${item.cr217_codigodeprestador}">
-                            <button>Descargar</button>
-                        </a>
+                    <td>${formatearFecha(item.createdon)}</td>
+                    <td class="text-center">
+                        <button class="btn-download" onclick="descargarInforme('${item.cr217_codigodeprestador}')">
+                            <i class="bi bi-file-earmark-text"></i> Descargar Informe
+                        </button>
                     </td>
                 </tr>
             `).join("");
 
             document.getElementById('prestador-body').innerHTML = cuerpo;
             document.getElementById('pagina-indicador').innerText = `Página ${paginaActual}`;
+            document.getElementById('total-registros').innerText = `Mostrando ${inicio + 1}-${Math.min(fin, filtrados.length)} de ${filtrados.length} registros`;
         }
 
         function paginaSiguiente() {
@@ -111,6 +304,38 @@
             }
         }
 
+        function formatearFecha(fecha) {
+            return new Date(fecha).toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        function descargarInforme(codigo) {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+            
+            window.location.href = `/download/${codigo}`;
+            
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 2000);
+        }
+
+        function exportarExcel() {
+            const wb = XLSX.utils.book_new();
+            const ws_data = filtrados.map(item => ({
+                'Código de Prestador': item.cr217_codigodeprestador,
+                'Fecha de Registro': formatearFecha(item.createdon)
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, "Prestadores");
+            XLSX.writeFile(wb, "prestadores_sunass.xlsx");
+        }
+
+        // Inicializar la página
         renderPagina();
     </script>
 </body>
