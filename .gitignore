@@ -1,13 +1,9 @@
-# Environment variables
-.env
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -22,6 +18,16 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
 
 # IDE
 .idea/
@@ -31,4 +37,18 @@ var/
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Project specific directories
+reports/
+BD/
+fotos/
+cr217_prestador/
+
+# Templates
+Templates/*.docx
+!Templates/modelo_final2.docx
+!Templates/modelo_final2_sin_prestador.docx
+
+# Logs
+*.log 

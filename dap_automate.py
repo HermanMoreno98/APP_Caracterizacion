@@ -44,6 +44,7 @@ from docxtpl import DocxTemplate
 
 import os
 import shutil
+import atexit
 
 
 # # Ejemplo de uso
@@ -1187,22 +1188,27 @@ def download_from_named_folder(drive_id, folder_name, headers, ruta_base):
 
     print(f"❌ Carpeta '{folder_name}' no encontrada (revisado {len(root_items)} elementos del root).")
 
+def cleanup_directories():
+    """Limpia los directorios temporales al cerrar la aplicación"""
+    try:
+        if os.path.exists('BD'):
+            shutil.rmtree('BD')
+        if os.path.exists('reports'):
+            shutil.rmtree('reports')
+    except Exception as e:
+        print(f"Error al limpiar directorios: {e}")
+
+# Registrar la función de limpieza para que se ejecute al cerrar la aplicación
+atexit.register(cleanup_directories)
+
 if __name__ == "__main__":
-    folder_path_report = "reports"
-    folder_path_bd = "BD"
-    os.makedirs(folder_path_report, exist_ok=True)
-    os.makedirs(folder_path_bd, exist_ok=True)
-    app.run(host='0.0.0.0', port=5001, debug=True)
-    # Verificar si la carpeta existe antes de intentar eliminarla
-    if os.path.exists(folder_path_report):
-        shutil.rmtree(folder_path_report)
-        print(f"🗑️ Carpeta '{folder_path_report}' eliminada correctamente.")
-    else:
-        print(f"⚠️ La carpeta '{folder_path_report}' no existe.")
-        
-    if os.path.exists(folder_path_bd):
-        shutil.rmtree(folder_path_bd)
-        print(f"🗑️ Carpeta '{folder_path_bd}' eliminada correctamente.")
-    else:
-        print(f"⚠️ La carpeta '{folder_path_bd}' no existe.")
+    # Crear directorios necesarios
+    for directory in ["reports", "BD"]:
+        os.makedirs(directory, exist_ok=True)
+    
+    # Obtener el puerto del entorno (Render lo proporciona) o usar 5000 por defecto
+    port = int(os.environ.get("PORT", 5001))
+    
+    # Iniciar la aplicación
+    app.run(host='0.0.0.0', port=port)
     
