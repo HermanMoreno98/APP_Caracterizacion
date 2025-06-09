@@ -11,3 +11,4 @@ exifread
 requests
 msal
 flask
+python-dotenv
