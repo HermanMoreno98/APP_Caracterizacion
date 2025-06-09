@@ -234,6 +234,9 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
+        // Debugging: Mostrar datos en la consola
+        console.log("Datos recibidos:", {{ data | tojson | safe }});
+        
         const data = {{ data | tojson | safe }};
         let porPagina = 20;
         let paginaActual = 1;

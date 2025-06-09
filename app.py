@@ -30,16 +30,24 @@ import generarInforme as cp
 import generarInforme_sin_prestador as sp
 from functools import reduce
 import requests
-from msal import PublicClientApplication
+from msal import PublicClientApplication, ConfidentialClientApplication
 from urllib.parse import quote
 import warnings
 warnings.filterwarnings("ignore")
 import pandas as pd
-from msal import ConfidentialClientApplication
 from dotenv import load_dotenv
+import jwt
 
 # Cargar variables de entorno
 load_dotenv()
+
+# Verificar variables de entorno
+required_env_vars = ["TENANT_ID", "CLIENT_ID", "CLIENT_SECRET", "RESOURCE"]
+missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+if missing_vars:
+    raise Exception(f"Faltan las siguientes variables de entorno: {', '.join(missing_vars)}")
+
+print("Variables de entorno cargadas correctamente")
 
 import os
 import shutil
@@ -69,7 +77,7 @@ CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 RESOURCE = os.getenv("RESOURCE")
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPE = [f"{RESOURCE}/.default"]
+SCOPE = [f"{RESOURCE}/.default"]  # Simplificando a un solo scope
 
 SCOPES_SHAREPOINT = ["https://graph.microsoft.com/.default"]
 
@@ -420,12 +428,71 @@ def obtener_df_prestador_simple(codigo_prestador, token, campos, nombres_columna
 
     return df
 
-# Obtener token interactivo
+# Modificar la función get_token para manejar ambos entornos
 def get_token():
-    app_msal = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
-    scopes = [f"{RESOURCE}/.default"]
-    result = app_msal.acquire_token_interactive(scopes=scopes)
-    return result["access_token"]
+    try:
+        print("\n=== Iniciando obtención de token ===")
+        
+        # Verificar si estamos en Render
+        is_production = os.environ.get("RENDER") == "true"
+        print(f"🌍 Entorno: {'Producción (Render)' if is_production else 'Desarrollo (Local)'}")
+        
+        # Verificar variables de entorno según el entorno
+        if is_production:
+            if not all([TENANT_ID, CLIENT_ID, CLIENT_SECRET, RESOURCE]):
+                raise ValueError("En producción se requieren todas las variables de entorno")
+        else:
+            if not all([TENANT_ID, CLIENT_ID, RESOURCE]):
+                raise ValueError("Faltan variables de entorno necesarias para la autenticación")
+            
+        print("✅ Variables de entorno verificadas")
+        print(f"🔐 Tenant ID: {TENANT_ID[:5]}...")
+        print(f"👤 Client ID: {CLIENT_ID[:5]}...")
+        print(f"🌐 Resource: {RESOURCE}")
+        
+        if is_production:
+            # Usar autenticación con credenciales en producción
+            print("🔒 Usando autenticación con credenciales de cliente")
+            app = ConfidentialClientApplication(
+                CLIENT_ID,
+                authority=AUTHORITY,
+                client_credential=CLIENT_SECRET
+            )
+            result = app.acquire_token_for_client(scopes=SCOPE)
+        else:
+            # Usar autenticación interactiva en desarrollo
+            print("🔑 Usando autenticación interactiva")
+            app = PublicClientApplication(
+                CLIENT_ID,
+                authority=AUTHORITY
+            )
+            
+            # Intentar obtener el token del caché primero
+            accounts = app.get_accounts()
+            if accounts:
+                print("📝 Intentando usar token en caché...")
+                result = app.acquire_token_silent(SCOPE, account=accounts[0])
+            else:
+                result = None
+                
+            if not result:
+                print("🔄 Solicitando autenticación interactiva...")
+                result = app.acquire_token_interactive(scopes=SCOPE)
+            
+        if "access_token" not in result:
+            error_msg = f"❌ Error al obtener token: {result.get('error_description', 'Sin descripción del error')}"
+            print(error_msg)
+            raise Exception(error_msg)
+            
+        print("✅ Token obtenido exitosamente")
+        return result["access_token"]
+        
+    except Exception as e:
+        print(f"❌ Error en get_token: {str(e)}")
+        import traceback
+        print("📋 Traceback completo:")
+        print(traceback.format_exc())
+        raise
 
 def get_token_sharepoint():
     app = ConfidentialClientApplication(
@@ -483,6 +550,7 @@ def get_bd_sharepoint(file_path, name_file):
 # Obtener datos desde Dataverse
 def get_data():
     token = get_token()
+    print(token)
     headers = {
         "Authorization": f"Bearer {token}",
         "OData-MaxVersion": "4.0",
@@ -497,24 +565,74 @@ def get_data():
 
 #LLamada con paginación para obtener todos los prestadores
 def fetch_all_prestadores():
-    token = get_token()
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "OData-MaxVersion": "4.0",
-        "OData-Version": "4.0",
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-    }
-    url = f"{RESOURCE}/api/data/v9.2/cr217_prestadors?$select=cr217_codigodeprestador,createdon&$orderby=createdon desc"
-    results = []
-
-    while url:
-        resp = requests.get(url, headers=headers)
-        data = resp.json()
-        results.extend(data.get("value", []))
-        url = data.get("@odata.nextLink")  # Siguiente página
-
-    return results
+    try:
+        print("\n=== Iniciando fetch_all_prestadores ===")
+        token = get_token()
+        print(f"✅ Token obtenido exitosamente")
+        
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "OData-MaxVersion": "4.0",
+            "OData-Version": "4.0",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Prefer": 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"'
+        }
+        
+        url = f"{RESOURCE}/api/data/v9.2/cr217_prestadors?$select=cr217_codigodeprestador,createdon&$orderby=createdon desc"
+        print(f"🔍 Consultando URL: {url}")
+        
+        results = []
+        try_count = 0
+        max_tries = 3
+        
+        while url and try_count < max_tries:
+            try:
+                print(f"\n📡 Intento {try_count + 1} de obtener datos...")
+                resp = requests.get(url, headers=headers)
+                print(f"📊 Status code: {resp.status_code}")
+                
+                if resp.status_code == 401:
+                    print("❌ Error de autenticación. Obteniendo nuevo token...")
+                    token = get_token()
+                    headers["Authorization"] = f"Bearer {token}"
+                    try_count += 1
+                    continue
+                    
+                if resp.status_code != 200:
+                    print(f"❌ Error en la respuesta: {resp.text}")
+                    return []
+                
+                data = resp.json()
+                current_batch = data.get("value", [])
+                print(f"✅ Registros obtenidos en este lote: {len(current_batch)}")
+                
+                if not current_batch:
+                    print("⚠️ No se encontraron registros en este lote")
+                    break
+                
+                results.extend(current_batch)
+                url = data.get("@odata.nextLink")
+                if url:
+                    print(f"➡️ Siguiente página disponible")
+                
+            except requests.exceptions.RequestException as e:
+                print(f"❌ Error en la solicitud HTTP: {str(e)}")
+                try_count += 1
+                continue
+                
+        print(f"\n🎉 Total de registros obtenidos: {len(results)}")
+        if not results:
+            print("⚠️ ADVERTENCIA: No se obtuvieron registros")
+            
+        return results
+        
+    except Exception as e:
+        print(f"❌ Error en fetch_all_prestadores: {str(e)}")
+        import traceback
+        print("📋 Traceback completo:")
+        print(traceback.format_exc())
+        return []
 
 # --- Función para generar informe usando plantilla ---
 def generate_report_with_template(prestador_id):
@@ -1097,14 +1215,43 @@ def generate_report_with_template(prestador_id):
     
 @app.route("/")
 def index():
-    # data = get_data()
-    data = fetch_all_prestadores()
-    return render_template("index.html", data=data)
+    try:
+        print("Iniciando obtención de datos...")
+        data = fetch_all_prestadores()
+        print(f"Datos obtenidos: {len(data)} registros")
+        print("Primeros 2 registros de ejemplo:", data[:2] if data else "No hay datos")
+        
+        return render_template("index.html", data=data)
+    except Exception as e:
+        print(f"Error en la ruta principal: {str(e)}")
+        # Devolver un mensaje de error más descriptivo al usuario
+        return f"""
+            <html>
+                <body>
+                    <h1>Error al cargar los datos</h1>
+                    <p>Detalles del error: {str(e)}</p>
+                    <p>Por favor, verifica:</p>
+                    <ul>
+                        <li>Las variables de entorno están configuradas correctamente</li>
+                        <li>La conexión con el servicio de datos está funcionando</li>
+                        <li>Los tokens de autenticación son válidos</li>
+                    </ul>
+                </body>
+            </html>
+        """, 500
 
 @app.route("/download/<prestador_id>")
 def download(prestador_id):
-    filepath = generate_report_with_template(prestador_id)
-    return send_file(filepath, as_attachment=True)
+    try:
+        # Asegurar que los directorios existan
+        os.makedirs("reports", exist_ok=True)
+        os.makedirs("BD", exist_ok=True)
+        
+        filepath = generate_report_with_template(prestador_id)
+        return send_file(filepath, as_attachment=True)
+    except Exception as e:
+        print(f"❌ Error al generar el informe: {str(e)}")
+        return f"Error al generar el informe: {str(e)}", 500
 
 
 def limpiar_y_convertir(valor):
@@ -1185,27 +1332,48 @@ def download_from_named_folder(drive_id, folder_name, headers, ruta_base):
 
     print(f"❌ Carpeta '{folder_name}' no encontrada (revisado {len(root_items)} elementos del root).")
 
-def cleanup_directories():
-    """Limpia los directorios temporales al cerrar la aplicación"""
-    try:
-        if os.path.exists('BD'):
-            shutil.rmtree('BD')
-        if os.path.exists('reports'):
-            shutil.rmtree('reports')
-    except Exception as e:
-        print(f"Error al limpiar directorios: {e}")
-
-# Registrar la función de limpieza para que se ejecute al cerrar la aplicación
-atexit.register(cleanup_directories)
 
 if __name__ == "__main__":
-    # Crear directorios necesarios
-    for directory in ["reports", "BD"]:
-        os.makedirs(directory, exist_ok=True)
-    
-    # Obtener el puerto del entorno (Render lo proporciona) o usar 5000 por defecto
-    port = int(os.environ.get("PORT", 5001))
-    
-    # Iniciar la aplicación
-    app.run(host='0.0.0.0', port=port)
+    try:
+        print("\n=== Iniciando aplicación ===")
+        # Crear directorios necesarios
+        folder_path_report = "reports"
+        folder_path_bd = "BD"
+        
+        print(f"📁 Creando directorio: {folder_path_report}")
+        os.makedirs(folder_path_report, exist_ok=True)
+        if os.path.exists(folder_path_report):
+            print(f"✅ Directorio {folder_path_report} creado correctamente")
+        else:
+            print(f"❌ Error al crear directorio {folder_path_report}")
+            
+        print(f"📁 Creando directorio: {folder_path_bd}")
+        os.makedirs(folder_path_bd, exist_ok=True)
+        if os.path.exists(folder_path_bd):
+            print(f"✅ Directorio {folder_path_bd} creado correctamente")
+        else:
+            print(f"❌ Error al crear directorio {folder_path_bd}")
+        
+        # Obtener el puerto del entorno (Render lo proporciona) o usar 5001 por defecto
+        port = int(os.environ.get("PORT", 5001))
+        print(f"🚀 Iniciando servidor en puerto {port}")
+        
+        # Iniciar la aplicación
+        app.run(host='0.0.0.0', port=port, debug=True)
+        
+    except Exception as e:
+        print(f"❌ Error al iniciar la aplicación: {str(e)}")
+        raise
+
+    if os.path.exists(folder_path_report):
+        shutil.rmtree(folder_path_report)
+        print(f"🗑️ Carpeta '{folder_path_report}' eliminada correctamente.")
+    else:
+        print(f"⚠️ La carpeta '{folder_path_report}' no existe.")
+        
+    if os.path.exists(folder_path_bd):
+        shutil.rmtree(folder_path_bd)
+        print(f"🗑️ Carpeta '{folder_path_bd}' eliminada correctamente.")
+    else:
+        print(f"⚠️ La carpeta '{folder_path_bd}' no existe.")
     

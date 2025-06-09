@@ -1,7 +1,10 @@
 bind = "0.0.0.0:10000"
-workers = 4
+workers = 2
 threads = 2
-timeout = 300
+timeout = 600
 worker_class = "sync"
 accesslog = "-"
-errorlog = "-" 
+errorlog = "-"
+worker_tmp_dir = "/dev/shm"
+max_requests = 1000
+max_requests_jitter = 50 
