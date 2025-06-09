@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prestadores</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .pagination {
+            margin-top: 10px;
+        }
+        button {
+            padding: 5px 10px;
+        }
+        input[type="text"] {
+            width: 90%;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Lista de Prestadores</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>
+                    Código de Prestador<br>
+                    <input type="text" id="filtroCodigo" placeholder="Buscar...">
+                </th>
+                <th>
+                    Fecha<br>
+                    <input type="text" id="filtroFecha" placeholder="Buscar...">
+                </th>
+                <th>Descargar Informe</th>
+            </tr>
+        </thead>
+        <tbody id="prestador-body">
+            <!-- Contenido generado por JS -->
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        <button onclick="paginaAnterior()">◀ Anterior</button>
+        <span id="pagina-indicador">Página 1</span>
+        <button onclick="paginaSiguiente()">Siguiente ▶</button>
+    </div>
+
+    <script>
+        const data = {{ data | tojson | safe }};
+        const porPagina = 20;
+        let paginaActual = 1;
+        let filtrados = data;
+
+        const inputCodigo = document.getElementById("filtroCodigo");
+        const inputFecha = document.getElementById("filtroFecha");
+
+        inputCodigo.addEventListener("input", aplicarFiltros);
+        inputFecha.addEventListener("input", aplicarFiltros);
+
+        function aplicarFiltros() {
+            const cod = inputCodigo.value.toLowerCase();
+            const fec = inputFecha.value.toLowerCase();
+
+            filtrados = data.filter(item =>
+                item.cr217_codigodeprestador.toLowerCase().includes(cod) &&
+                item.createdon.toLowerCase().includes(fec)
+            );
+            paginaActual = 1;
+            renderPagina();
+        }
+
+        function renderPagina() {
+            const inicio = (paginaActual - 1) * porPagina;
+            const fin = paginaActual * porPagina;
+            const visibles = filtrados.slice(inicio, fin);
+
+            const cuerpo = visibles.map(item => `
+                <tr>
+                    <td>${item.cr217_codigodeprestador}</td>
+                    <td>${item.createdon}</td>
+                    <td>
+                        <a href="/download/${item.cr217_codigodeprestador}">
+                            <button>Descargar</button>
+                        </a>
+                    </td>
+                </tr>
+            `).join("");
+
+            document.getElementById('prestador-body').innerHTML = cuerpo;
+            document.getElementById('pagina-indicador').innerText = `Página ${paginaActual}`;
+        }
+
+        function paginaSiguiente() {
+            if ((paginaActual * porPagina) < filtrados.length) {
+                paginaActual++;
+                renderPagina();
+            }
+        }
+
+        function paginaAnterior() {
+            if (paginaActual > 1) {
+                paginaActual--;
+                renderPagina();
+            }
+        }
+
+        renderPagina();
+    </script>
+</body>
+</html>

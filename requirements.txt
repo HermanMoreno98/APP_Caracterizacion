@@ -1,0 +1,13 @@
+pandas
+docxtpl
+python-docx
+matplotlib
+babel
+numpy
+natsort
+Pillow
+piexif
+exifread
+requests
+msal
+flask
