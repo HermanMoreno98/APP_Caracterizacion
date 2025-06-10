@@ -2,7 +2,7 @@
 from flask import Flask, render_template, send_file, redirect, url_for
 
 # Crear la aplicación Flask
-application = Flask(__name__)
+application = Flask(__name__, template_folder='templates')
 app = application
 
 # Resto de importaciones
