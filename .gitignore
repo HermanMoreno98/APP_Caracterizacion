@@ -46,9 +46,9 @@ fotos/
 cr217_prestador/
 
 # Templates
-Templates/*.docx
-!Templates/modelo_final2.docx
-!Templates/modelo_final2_sin_prestador.docx
+templates/*.docx
+!templates/modelo_final2.docx
+!templates/modelo_final2_sin_prestador.docx
 
 # Logs
 *.log 
