@@ -1138,9 +1138,9 @@ def generate_report_with_template(prestador_id):
     df_prestador = reduce(lambda left, right: pd.merge(left, right, on='codigodeprestador', how='left'), 
                         [df_prestador] + dfs_to_merge)
     
-    doc_cp = DocxTemplate("Templates/modelo_final2.docx")
+    doc_cp = DocxTemplate("templates/modelo_final2.docx")
     if (df_prestador['p016_nombredelprestador'].values[0] == "ABASTECIMIENTO SIN PRESTADOR"):
-        doc_cp = DocxTemplate("Templates/modelo_final2_sin_prestador.docx")
+        doc_cp = DocxTemplate("templates/modelo_final2_sin_prestador.docx")
 
 
     try:
