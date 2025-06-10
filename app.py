@@ -27,7 +27,6 @@ from PIL import Image, ExifTags
 from io import BytesIO
 warnings.filterwarnings("ignore") # Ignorar todos los warnings
 import generarInforme as cp
-import generarInforme_sin_prestador as sp
 from functools import reduce
 import requests
 from msal import PublicClientApplication, ConfidentialClientApplication
@@ -37,6 +36,7 @@ warnings.filterwarnings("ignore")
 import pandas as pd
 from dotenv import load_dotenv
 import jwt
+import gc
 
 # Cargar variables de entorno
 load_dotenv()
@@ -47,7 +47,6 @@ missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 if missing_vars:
     raise Exception(f"Faltan las siguientes variables de entorno: {', '.join(missing_vars)}")
 
-print("Variables de entorno cargadas correctamente")
 
 import os
 import shutil
@@ -101,17 +100,14 @@ def obtener_datos_relacionados(prestador_id, columnas, propiedad_navegacion,toke
     
     url = f"{RESOURCE}/api/data/v9.2/cr217_prestadors({prestador_id})?$expand={expand_encoded}"
 
-    print(f"🔗 Consultando URL: {url}")
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
 
     if propiedad_navegacion in data:
         registros = data[propiedad_navegacion]
-        print(f"✅ {len(registros)} registros encontrados en la relación '{propiedad_navegacion}'")
         return registros
-    else:
-        print(f"⚠️ No se encontraron registros en la relación '{propiedad_navegacion}'")
+    else:    
         return []
 
 # =====================================
@@ -134,30 +130,20 @@ def obtener_relacion_por_codigo(prestador_id, columnas, propiedad_navegacion,tok
     
     url = f"{RESOURCE}/api/data/v9.2/cr217_prestadors?$select=cr217_prestadorid&$filter={filtro_encoded}"
 
-    print(f"🔍 Buscando ID del prestador con código '{prestador_id}'...")
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
 
     if not data["value"]:
-        print("❌ Prestador no encontrado.")
         return []
 
     prestador_id = data["value"][0]["cr217_prestadorid"]
-    print(f"✅ ID encontrado: {prestador_id}")
 
     return obtener_datos_relacionados(prestador_id, columnas, propiedad_navegacion,token)
 
 # ===============================
 # 🧪 Ejemplo de uso
 
-# codigo = "P-09692-G4F6W"
-# columnas = ["cr217_nombredelafuente","cr217_cuentaconlicenciauso", "createdon"]
-# propiedad_navegacion = "cr217_cr217_fuente_Prestador_cr217_prestador"
-
-# datos = obtener_relacion_por_codigo(codigo, columnas, propiedad_navegacion,token)
-
-# print(datos)
 def obtener_elementos_por_sistema(sistema_id, tipo_sistema, entidad_relacion, campos, token):
     """
     tipo_sistema: "agua" o "alcantarillado"
@@ -231,7 +217,6 @@ def generar_df_elementos_relacionados(codigo_prestador, tipo_sistema, entidad_re
     data = response.json()
 
     if not data["value"]:
-        print("❌ Prestador no encontrado.")
         return pd.DataFrame()
 
     prestador_id = data["value"][0]["cr217_prestadorid"]
@@ -278,7 +263,6 @@ def obtener_prestador_id(codigo_prestador, token):
     data = response.json()
 
     if not data["value"]:
-        print("❌ Prestador no encontrado.")
         return pd.DataFrame()
 
     prestador_id = data["value"][0]["cr217_prestadorid"]
@@ -497,7 +481,6 @@ def get_bd_sharepoint(file_path, name_file):
 # Obtener datos desde Dataverse
 def get_data():
     token = get_token()
-    print(token)
     headers = {
         "Authorization": f"Bearer {token}",
         "OData-MaxVersion": "4.0",
@@ -513,9 +496,7 @@ def get_data():
 #LLamada con paginación para obtener todos los prestadores
 def fetch_all_prestadores():
     try:
-        print("\n=== Iniciando fetch_all_prestadores ===")
         token = get_token()
-        print(f"✅ Token obtenido exitosamente")
         
         headers = {
             "Authorization": f"Bearer {token}",
@@ -527,7 +508,6 @@ def fetch_all_prestadores():
         }
         
         url = f"{RESOURCE}/api/data/v9.2/cr217_prestadors?$select=cr217_codigodeprestador,createdon&$orderby=createdon desc"
-        print(f"🔍 Consultando URL: {url}")
         
         results = []
         try_count = 0
@@ -535,50 +515,34 @@ def fetch_all_prestadores():
         
         while url and try_count < max_tries:
             try:
-                print(f"\n📡 Intento {try_count + 1} de obtener datos...")
                 resp = requests.get(url, headers=headers)
-                print(f"📊 Status code: {resp.status_code}")
                 
                 if resp.status_code == 401:
-                    print("❌ Error de autenticación. Obteniendo nuevo token...")
                     token = get_token()
                     headers["Authorization"] = f"Bearer {token}"
                     try_count += 1
                     continue
                     
                 if resp.status_code != 200:
-                    print(f"❌ Error en la respuesta: {resp.text}")
                     return []
                 
                 data = resp.json()
                 current_batch = data.get("value", [])
-                print(f"✅ Registros obtenidos en este lote: {len(current_batch)}")
+              
                 
                 if not current_batch:
-                    print("⚠️ No se encontraron registros en este lote")
                     break
                 
                 results.extend(current_batch)
                 url = data.get("@odata.nextLink")
-                if url:
-                    print(f"➡️ Siguiente página disponible")
                 
             except requests.exceptions.RequestException as e:
-                print(f"❌ Error en la solicitud HTTP: {str(e)}")
                 try_count += 1
                 continue
-                
-        print(f"\n🎉 Total de registros obtenidos: {len(results)}")
-        if not results:
-            print("⚠️ ADVERTENCIA: No se obtuvieron registros")
             
         return results
         
     except Exception as e:
-        print(f"❌ Error en fetch_all_prestadores: {str(e)}")
-        import traceback
-        print("📋 Traceback completo:")
-        print(traceback.format_exc())
         return []
 
 # --- Función para generar informe usando plantilla ---
@@ -621,7 +585,6 @@ def generate_report_with_template(prestador_id):
     else:
         site = response.json()
         site_id = site["id"]
-        print(f"Site ID: {site_id}")
 
     document_library_id = "2d1282da-c17d-4888-9111-d1ee867b9510"
 
@@ -980,10 +943,6 @@ def generate_report_with_template(prestador_id):
     df_prestador = pd.merge(df_prestador,df_centropobladoscercano, on="codigodeprestador", how="left")
     df_prestador.rename(columns={"codigodecentropoblado": "centropoblado"}, inplace=True)
 
-    print(df_prestador)
-    print(df_fuente)
-    print(df_captacion)
-
     # Polacion servida
     campos = ["cr217_conexionesdeaguaactivas", "cr217_conexionesdealcantarilladoactivas",
             "cr217_conexionesdeaguatotales","cr217_conexionesdealcantarilladototales","cr217_cantidaddeubsenelccpp",
@@ -1120,11 +1079,8 @@ def generate_report_with_template(prestador_id):
     # ruta_bd = "/Users/paulmoreno/SUNASS/INFORME_CARACTERIZACION/BD"
     ruta_fotos = ruta_base
     inei_2017 = get_bd_sharepoint("AUTOMATIZACION/BD/PedidoCCPP_validado.xlsx","BD/PedidoCCPP_validado.xlsx")
-    print(inei_2017)
-    # inei_2017 = pd.read_excel(ruta_bd + "/PedidoCCPP_validado.xlsx", sheet_name="CCPP")
 
     inei_2017['ubigeo_ccpp'] = pd.to_numeric(inei_2017['ubigeo_ccpp'], errors='coerce') #Conviertiendo el ubigeo a numeric
-    #inei_2017['tipo_ref'] = inei_2017['Ubic_APC_EPES'].apply(lambda x: 'tipo1' if x in ['Dentro del Área con población servida de la EPS','A 2.5 Km del Área con población servida de la EPS'] else 'tipo2')
     inei_2017['ambito_ccpp'] = inei_2017['POBTOTAL'].apply(lambda x: 'Rural' if x <= 2000 else 'Pequeña Ciudad' if x > 2000 & x <= 15000 else 'Urbano')
     inei_2017 = inei_2017[['ubigeo_ccpp','NOMDEP','NOMPROV','NOMDIST','NOMCCPP','POBTOTAL','VIVTOTAL','densidad_pob','Ubic_APC_EPES','ambito_ccpp']]
 
@@ -1152,9 +1108,7 @@ def generate_report_with_template(prestador_id):
     # Verificar si la carpeta existe antes de intentar eliminarla
     if os.path.exists(folder_path):
         shutil.rmtree(folder_path)
-        print(f"🗑️ Carpeta '{folder_path}' eliminada correctamente.")
-    else:
-        print(f"⚠️ La carpeta '{folder_path}' no existe.")
+
     
     output_filename = f"INFORME_{prestador_id}.docx"
     filepath = os.path.join("reports", output_filename)
@@ -1163,14 +1117,10 @@ def generate_report_with_template(prestador_id):
 @app.route("/")
 def index():
     try:
-        print("Iniciando obtención de datos...")
         data = fetch_all_prestadores()
-        print(f"Datos obtenidos: {len(data)} registros")
-        print("Primeros 2 registros de ejemplo:", data[:2] if data else "No hay datos")
         
         return render_template("index.html", data=data)
     except Exception as e:
-        print(f"Error en la ruta principal: {str(e)}")
         # Devolver un mensaje de error más descriptivo al usuario
         return f"""
             <html>
@@ -1190,16 +1140,89 @@ def index():
 @app.route("/download/<prestador_id>")
 def download(prestador_id):
     try:
-        # Asegurar que los directorios existan
-        os.makedirs("reports", exist_ok=True)
-        os.makedirs("BD", exist_ok=True)
+        # Crear un directorio temporal único para este proceso
+        reports_dir = "reports"
+        bd_dir = "BD"
         
-        filepath = generate_report_with_template(prestador_id)
-        return send_file(filepath, as_attachment=True)
+        
+        for dir_path in [reports_dir, bd_dir]:
+            os.makedirs(dir_path, exist_ok=True)        
+        
+        try:
+            filepath = generate_report_with_template(prestador_id)
+            return send_file(filepath, as_attachment=True)
+        finally:        
+            for dir_path in [reports_dir, bd_dir]:
+                if os.path.exists(dir_path):
+                    shutil.rmtree(dir_path)
+                    print(f"✅ Directorio eliminado: {dir_path}")
+            
     except Exception as e:
-        print(f"❌ Error al generar el informe: {str(e)}")
         return f"Error al generar el informe: {str(e)}", 500
 
+def download_from_named_folder(drive_id, folder_name, headers, ruta_base):
+    """Busca la carpeta por nombre en el root del drive y descarga las imágenes una por una"""
+    root_items = get_all_root_items(drive_id, headers)
+    
+    folder_id = None
+    for item in root_items:
+        if item["name"] == folder_name and "folder" in item:
+            folder_id = item["id"]
+            break
+    
+    if not folder_id:
+        return
+        
+    # Obtener lista de archivos en la carpeta
+    url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{folder_id}/children"
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    items = response.json()["value"]
+    
+    # Crear directorio destino
+    dest_path = f"{ruta_base}/{folder_name}"
+    os.makedirs(dest_path, exist_ok=True)
+    
+    # Descargar archivos uno por uno
+    for item in items:
+        try:
+            if "folder" in item:
+                continue  # Saltar carpetas
+                
+            item_name = item["name"]
+            item_path = os.path.join(dest_path, item_name)
+            
+            # Solo descargar imágenes y archivos pequeños
+            if item["size"] > 10 * 1024 * 1024:  # Saltar archivos mayores a 10MB
+                continue
+                
+            download_url = item["@microsoft.graph.downloadUrl"]
+            
+            # Descargar y escribir el archivo en chunks
+            with requests.get(download_url, stream=True) as r:
+                r.raise_for_status()
+                with open(item_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            
+            # Si es una imagen, optimizarla
+            if item_name.lower().endswith(('.png', '.jpg', '.jpeg')):
+                try:
+                    with Image.open(item_path) as img:
+                        # Redimensionar si es muy grande
+                        if img.width > 1600 or img.height > 1600:
+                            img.thumbnail((1600, 1600))
+                        # Optimizar calidad
+                        img.save(item_path, optimize=True, quality=85)
+                except Exception as e:
+                    print(f"⚠️ Error al optimizar imagen {item_name}: {e}")
+                    
+        except Exception as e:
+            print(f"⚠️ Error al descargar {item_name}: {e}")
+            continue
+            
+        # Forzar liberación de memoria
+        gc.collect()
 
 def limpiar_y_convertir(valor):
     if pd.isna(valor):
@@ -1217,7 +1240,6 @@ def limpiar_y_convertir(valor):
 
 def find_folder_by_prefix(drive_id, prefix, headers):
     """Busca la primera carpeta en el root cuyo nombre comienza con el prefijo dado."""
-    print(f"🔍 Buscando carpeta que empieza con: '{prefix}'...")
     all_items = get_all_root_items(drive_id, headers)
 
     for item in all_items:
@@ -1225,7 +1247,6 @@ def find_folder_by_prefix(drive_id, prefix, headers):
             print(f"✅ Carpeta encontrada: {item['name']}")
             return item["name"]  # Retorna el nombre completo
 
-    print(f"❌ No se encontró ninguna carpeta que comience con: '{prefix}'")
     return None
 
 def download_drive_folder(drive_id, item_id, local_path, headers):
@@ -1245,7 +1266,6 @@ def download_drive_folder(drive_id, item_id, local_path, headers):
             download_drive_folder(drive_id, item["id"], item_path, headers)
         else:
             download_url = item["@microsoft.graph.downloadUrl"]
-            print(f"⬇️ Descargando: {item_path}")
             r = requests.get(download_url)
             with open(item_path, "wb") as f:
                 f.write(r.content)
@@ -1268,7 +1288,6 @@ def get_all_root_items(drive_id, headers):
 
 def download_from_named_folder(drive_id, folder_name, headers, ruta_base):
     """Busca la carpeta por nombre en el root del drive y la descarga"""
-    print(f"🔎 Buscando la carpeta '{folder_name}' en el root del drive...")
     root_items = get_all_root_items(drive_id, headers)
 
     for item in root_items:
@@ -1277,33 +1296,19 @@ def download_from_named_folder(drive_id, folder_name, headers, ruta_base):
             download_drive_folder(drive_id, folder_id, f"{ruta_base}/{folder_name}", headers)
             return
 
-    print(f"❌ Carpeta '{folder_name}' no encontrada (revisado {len(root_items)} elementos del root).")
 
 
 if __name__ == "__main__":
     try:
-        print("\n=== Iniciando aplicación ===")
         # Crear directorios necesarios
         folder_path_report = "reports"
         folder_path_bd = "BD"
         
-        print(f"📁 Creando directorio: {folder_path_report}")
         os.makedirs(folder_path_report, exist_ok=True)
-        if os.path.exists(folder_path_report):
-            print(f"✅ Directorio {folder_path_report} creado correctamente")
-        else:
-            print(f"❌ Error al crear directorio {folder_path_report}")
-            
-        print(f"📁 Creando directorio: {folder_path_bd}")
         os.makedirs(folder_path_bd, exist_ok=True)
-        if os.path.exists(folder_path_bd):
-            print(f"✅ Directorio {folder_path_bd} creado correctamente")
-        else:
-            print(f"❌ Error al crear directorio {folder_path_bd}")
         
         # Obtener el puerto del entorno (Render lo proporciona) o usar 5001 por defecto
         port = int(os.environ.get("PORT", 5001))
-        print(f"🚀 Iniciando servidor en puerto {port}")
         
         # Iniciar la aplicación
         app.run(host='0.0.0.0', port=port, debug=True)
@@ -1314,13 +1319,9 @@ if __name__ == "__main__":
 
     if os.path.exists(folder_path_report):
         shutil.rmtree(folder_path_report)
-        print(f"🗑️ Carpeta '{folder_path_report}' eliminada correctamente.")
-    else:
-        print(f"⚠️ La carpeta '{folder_path_report}' no existe.")
+
         
     if os.path.exists(folder_path_bd):
         shutil.rmtree(folder_path_bd)
-        print(f"🗑️ Carpeta '{folder_path_bd}' eliminada correctamente.")
-    else:
-        print(f"⚠️ La carpeta '{folder_path_bd}' no existe.")
+
     

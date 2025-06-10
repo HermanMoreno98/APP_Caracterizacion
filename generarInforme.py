@@ -813,7 +813,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
 
     # Captacion
     df_captacion['nombredelacaptacion'] = df_captacion['nombredelacaptacion'].apply(lambda x: 'Captación ' + str(x) if not str(x).lower().count('capta') else str(x))
-    print(df_captacion[['zona']])
     df_captacion_prueba = pd.merge(df_sistema_agua_prueba[['codigodesistemadeagua']],df_captacion[[
     'codigodesistemadeagua','nombredelacaptacion','anodeconstruccion','estadooperativodelacaptacion','justifiquesurespuestacaptacion','zona','este','norte','altitud'
     ]],on='codigodesistemadeagua',how='inner').rename(columns={'nombredelacaptacion':'nombre','anodeconstruccion':'aniodeconstruccion','estadooperativodelacaptacion':'estadooperativo','justifiquesurespuestacaptacion':'descripcion'})
@@ -1113,7 +1112,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
             df_sistema_general['Nombre_aux'] = df_sistema_general.apply(lambda row: row['nombre'] + str(row['N_aux']), axis=1)
         else:
             df_sistema_general['Nombre_aux'] = np.nan
-        #print(df_sistema_general['Nombre_aux'])
 
         df_sistema_nombre = pd.concat([df_captacion_prueba,df_equipo_bombeo,df_conduccion_prueba,df_ptap_prueba_general,df_reservorio_prueba,df_distribucion],ignore_index=True)
         df_sistema_nombre['N_aux'] = df_sistema_nombre.groupby(['codigodesistemadeagua','nombre']).cumcount() + 1
@@ -1130,8 +1128,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
         else:
             df_sistema_nombre['nombre_fin'] = np.nan
 
-        #print(df_sistema_general)
-        #print(df_sistema_nombre)
         df_sistema_nombre_general_2 = pd.merge(df_sistema_general,df_sistema_nombre[['codigodesistemadeagua','nombre_fin','Nombre_aux','zona','este','norte','altitud']],on=['codigodesistemadeagua', 'Nombre_aux'], how='left')
         df_sistema_nombre_general_2['zona'] = df_sistema_nombre_general_2['zona_x'].combine_first(df_sistema_nombre_general_2['zona_y'])
         df_sistema_nombre_general_2['este'] = df_sistema_nombre_general_2['este_x'].combine_first(df_sistema_nombre_general_2['este_y'])
@@ -1144,8 +1140,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
         df_sistema_nombre_general_2['antiguedad'] = df_sistema_nombre_general_2['aniodeconstruccion'].apply(calcular_anios)
 
         df_sistema_nombre_general_2 = df_sistema_nombre_general_2[['codigodesistemadeagua', 'nombre','antiguedad','estadooperativo', 'descripcion','zona','este','norte','altitud']]
-        #print(df_sistema_nombre_general_2)
-
         # Filtrar el DataFrame para incluir solo los registros que contienen "Línea de conducción / Impulsión" y "Reservorio"
         if not df_sistema_nombre_general_2.empty:
             filtro = df_sistema_nombre_general_2['nombre'].str.contains('Línea de conducción / Impulsión|Reservorio')
@@ -1164,8 +1158,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
             df_sistema_nombre_general_2['nombre_sin_numero'] = np.nan
 
         coordenadas_agua = df_sistema_nombre_general_2.loc[df_sistema_nombre_general_2['zona'].notnull(),['nombre_sin_numero','zona','este','norte','altitud']].rename(columns={'nombre_sin_numero':'nombre'})
-        print(df_sistema_nombre_general_2[['codigodesistemadeagua','zona']])
-        print(coordenadas_agua)
         df_noconvencional = df_sistema_agua_prueba[['p004_zona','p004_este','p004_norte','p004_altitud']].rename(columns={
             'p004_zona':'zona','p004_este':'este','p004_norte':'norte','p004_altitud':'altitud'
         })
@@ -1492,8 +1484,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
 
 
     lista_total = listadopreliminar + listadoprimario + listadosecundario
-    print(df_sistema_alca_prueba)
-    print(df_ptar_prueba)
     df_ebar = pd.DataFrame()
     if not df_sistema_alca_prueba.empty:
         df_ebar = df_sistema_alca_prueba[['zona','este','norte','altitud']]
@@ -1504,13 +1494,9 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
         df_tar.insert(0,'nombre','PTAR')
 
     componentes_final = pd.concat([coordenadas_agua,df_noconvencional,df_ebar,df_tar])
-    #componentes_final = componentes_final.loc[((componentes_final['este'].notnull()) or (componentes_final['este'] != '-'))]
+
     componentes_final = componentes_final.loc[(componentes_final['este'].notnull()) & (componentes_final['este'] != '-')]
-    # componentes_final['este'] = componentes_final['este'].astype(int)
-    # componentes_final['norte'] = componentes_final['norte'].astype(int)
-    #componentes_final['altitud'] = componentes_final['altitud'].astype(int)
-    #print(componentes_final['este'])
-    #print(componentes_final['norte'])
+
     componentes_final['este'] = componentes_final['este'].apply(lambda x: int(x) if pd.notnull(x) else "-")
     componentes_final['norte'] = componentes_final['norte'].apply(lambda x: int(x) if pd.notnull(x) else "-")
     componentes_final['altitud'] = componentes_final['altitud'].apply(lambda x: int(x) if pd.notnull(x) else "-")
@@ -1659,20 +1645,10 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
         'Gasto Promedio': [gasto_promedio('p001_pozopropio'), gasto_promedio('p001_camiones'), gasto_promedio('p001_acarreo'), gasto_promedio('p001_otro')],
         'Litros Promedio': [litros_promedio('p001_pozopropio'), litros_promedio('p001_camiones'), litros_promedio('p001_acarreo'), litros_promedio('p001_otro')]
     }
-    #print(resumen)
+
     otros_tipos = df_usuario_prueba_no[df_usuario_prueba_no['p001_otro'] == 'Si']['p001a_otraformaabastecimiento'].str.lower().unique()
     otros_tipos = [x for x in otros_tipos if not (isinstance(x, float) and np.isnan(x))] 
   
-    # for tipo in otros_tipos:
-    #     if tipo:  # Asegurar que el valor no esté vacío
-    #         cantidad = ((df_usuario_prueba_no['p001_otro'] == 'Si') & (df_usuario_prueba_no['p001a_otraformaabastecimiento'] == tipo)).sum()
-    #         gasto_prom = df_usuario_prueba_no.loc[(df_usuario_prueba_no['p001_otro'] == 'Si') & (df_usuario_prueba_no['p001a_otraformaabastecimiento'] == tipo), 'p002_cuantoeselgastomensualenagua'].mean()
-    #         litros_prom = df_usuario_prueba_no.loc[(df_usuario_prueba_no['p001_otro'] == 'Si') & (df_usuario_prueba_no['p001a_otraformaabastecimiento'] == tipo), 'p002a_litrosequivalencia'].mean()
-    #         print(cantidad)
-    #         resumen['tipo'].append(f'Otro - {tipo}')
-    #         resumen['Cantidad'].append(cantidad)
-    #         resumen['Gasto Promedio'].append(gasto_prom)
-    #         resumen['Litros Promedio'].append(litros_prom)
 
     resumen_abastecimiento = pd.DataFrame(resumen)
     resumen_abastecimiento['Descripción'] = None 
@@ -1826,7 +1802,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
     for index, row in resumen_abastecimiento.iterrows():
         texto_gastoagua = f"En promedio, los usuarios que se abastecen mediante {row['Descripción']} gastan mensualmente S/. {row['Gasto Promedio']} soles para obtener el agua."
         gastomensual.append(texto_gastoagua)
-    #print(gastomensual)
     litrosagua = []
     for index, row in resumen_abastecimiento.iterrows():
         texto_listrosagua = f"En promedio, los usuarios que se abastecen mediante {row['Descripción']} consumen mensualmente {row['Litros Promedio']} litros de agua al mes."
@@ -1924,7 +1899,7 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
     for index, row in df_gastos.iterrows():
         texto_gasto = f"En promedio, los usuarios gastan S/. {row['Promedio de Gasto']} soles para el servicio de {row['Categoria']} al mes."
         gastos.append(texto_gasto)
-    #print(gastos)
+
 
     # Graficos automaticos gasto de otros servicios
     num_items = len(df_gastos)
@@ -2049,15 +2024,8 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
     cantidad_porcentaje_disposicion_recibir_si = cantidad_disposicion_recibir.get('Si',0)
     cantidad_porcentaje_disposicion_recibir_total = df_usuario_prueba_no['p013a_estariadispuestoqueesteotrolebrindeserv'].count()
     nombre_prestador = df_usuario_prueba_no['p013_1_nombreyubicaciondeprestador'].dropna()
-    # print(nombre_prestador)
-    # if nombre_prestador.empty:
-    #     nombre_prestador = '-'
-    # else:
-    #     nombre_prestador = nombre_prestador.iloc[0].values[0]
-    # if nombre_prestador.empty:
-    #     nombre_prestador = '-'
-    # if not nombre_prestador.empty:
-    #     nombre_prestador = nombre_prestador.iloc[0].values[0]
+
+
     texto_disposicion_recibir = f'El {porcentaje_porcentaje_disposicion_recibir_si} ({cantidad_porcentaje_disposicion_recibir_si} de {cantidad_porcentaje_disposicion_recibir_total}) de usuarios refieren que estarían de acuerdo con que el prestador {nombre_prestador}, les provea del servicio.'
 
 
@@ -2084,8 +2052,6 @@ def generarInforme(codigo,df_prestador,inei_2017,df_ps,df_fuente,df_sistema_agua
 
     # Recursos fotograficos
     carpetaprestador = df_prueba['carpetaprestador'].values[0]
-    print(carpetaprestador)
-    print(os.path.join(ruta_fotos, carpetaprestador, 'FOTOS', '*'))
     ruta_carpeta_fotos = ruta_fotos + "\\" + carpetaprestador
     
     #Formatos de imagen
