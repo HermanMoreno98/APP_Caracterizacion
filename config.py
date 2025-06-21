@@ -396,6 +396,12 @@ REQUIRED_ENV_VARS = ["TENANT_ID", "CLIENT_ID", "CLIENT_SECRET", "RESOURCE"]
 # if missing_vars:
 #     raise EnvironmentError(f"Faltan las siguientes variables de entorno: {', '.join(missing_vars)}")
 
+REQUIRED_ENV_VARS = {
+    "TENANT_ID": TENANT_ID,
+    "CLIENT_ID": CLIENT_ID,
+    "CLIENT_SECRET": CLIENT_SECRET,
+    "RESOURCE": RESOURCE_DATAVERSE
+}
 missing_vars = [key for key, val in REQUIRED_ENV_VARS.items() if not val]
 if missing_vars:
     raise EnvironmentError(f"Faltan las siguientes variables de entorno: {', '.join(missing_vars)}")
