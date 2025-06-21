@@ -189,9 +189,9 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
     # --- 5. DETERMINAR PLANTILLA DOCX ---
     logger.info("Paso 5: Determinando plantilla DOCX...")
     plantilla_path = config.TEMPLATE_PRINCIPAL
-    nombre_prest_val = _get_value(df_prestador_final, 'p016_nombredelprestador', "")
-    if nombre_prest_val == "ABASTECIMIENTO SIN PRESTADOR":
-        plantilla_path = config.TEMPLATE_SIN_PRESTADOR
+    # nombre_prest_val = _get_value(df_prestador_final, 'p016_nombredelprestador', "")
+    # if nombre_prest_val == "ABASTECIMIENTO SIN PRESTADOR":
+    #     plantilla_path = config.TEMPLATE_SIN_PRESTADOR
     logger.info(f"Usando plantilla: {plantilla_path}")
     try:
         doc = DocxTemplate(plantilla_path)

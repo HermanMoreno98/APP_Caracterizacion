@@ -1,13 +1,10 @@
-# bind = "0.0.0.0:10000"
-# workers = 2
-# threads = 2
-# timeout = 600
-# worker_class = "sync"
-# accesslog = "-"
-# errorlog = "-"
-# worker_tmp_dir = "/tmp"
-# max_requests = 1000
-# max_requests_jitter = 50 
-
-import os
-bind = f"0.0.0.0:{os.environ.get('PORT', '8000')}"
+bind = "0.0.0.0:10000"
+workers = 2
+threads = 2
+timeout = 600
+worker_class = "sync"
+accesslog = "-"
+errorlog = "-"
+worker_tmp_dir = "/tmp"
+max_requests = 1000
+max_requests_jitter = 50 

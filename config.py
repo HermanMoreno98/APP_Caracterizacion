@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# load_dotenv()
+load_dotenv()
 
 # --- Dataverse / Azure AD ---
 TENANT_ID = os.getenv("TENANT_ID")
@@ -392,17 +392,7 @@ COLUMNAS_FLOAT_SISTEMA_AGUA = ['p043_clororesidualpuntomaslejano','turbidezunt',
 
 # Verificar variables de entorno
 REQUIRED_ENV_VARS = ["TENANT_ID", "CLIENT_ID", "CLIENT_SECRET", "RESOURCE"]
-# missing_vars = [var for var in REQUIRED_ENV_VARS if not globals().get(var.replace("RESOURCE", "RESOURCE_DATAVERSE"))] # Ajuste por renombramiento
-# if missing_vars:
-#     raise EnvironmentError(f"Faltan las siguientes variables de entorno: {', '.join(missing_vars)}")
-
-REQUIRED_ENV_VARS = {
-    "TENANT_ID": TENANT_ID,
-    "CLIENT_ID": CLIENT_ID,
-    "CLIENT_SECRET": CLIENT_SECRET,
-    "RESOURCE": RESOURCE_DATAVERSE
-}
-missing_vars = [key for key, val in REQUIRED_ENV_VARS.items() if not val]
+missing_vars = [var for var in REQUIRED_ENV_VARS if not globals().get(var.replace("RESOURCE", "RESOURCE_DATAVERSE"))] # Ajuste por renombramiento
 if missing_vars:
     raise EnvironmentError(f"Faltan las siguientes variables de entorno: {', '.join(missing_vars)}")
 
