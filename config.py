@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
 # --- Dataverse / Azure AD ---
 TENANT_ID = os.getenv("TENANT_ID")
@@ -406,9 +406,3 @@ missing_vars = [key for key, val in REQUIRED_ENV_VARS.items() if not val]
 if missing_vars:
     raise EnvironmentError(f"Faltan las siguientes variables de entorno: {', '.join(missing_vars)}")
 
-
-import os
-print("TENANT_ID:", os.getenv("TENANT_ID"))
-print("CLIENT_ID:", os.getenv("CLIENT_ID"))
-print("CLIENT_SECRET:", os.getenv("CLIENT_SECRET"))
-print("RESOURCE:", os.getenv("RESOURCE"))
