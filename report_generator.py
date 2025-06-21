@@ -92,8 +92,8 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
 
     # --- 2. DESCARGAR ARCHIVOS DE SHAREPOINT ---
     logger.info("Paso 2: Descargando archivos de SharePoint...")
-    ruta_inei_local = get_bd_inei_sharepoint(config.DIR_BD_TEMP)
-    inei_2017_df = pd.read_excel(ruta_inei_local, sheet_name="CCPP") # Asegúrate del nombre de la hoja
+    # ruta_inei_local = get_bd_inei_sharepoint(config.DIR_BD_TEMP)
+    # inei_2017_df = pd.read_excel(ruta_inei_local, sheet_name="CCPP") # Asegúrate del nombre de la hoja
     
     # guid_prestador_dv = _get_value(df_prestador, 'prestadorid', None)
     # ruta_fotos_locales_prestador = None
@@ -130,12 +130,18 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
     # df_disposicionfinal_raw no parece necesitar limpieza de tipos según el original
 
     # Pre-procesar INEI (ya hecho parcialmente antes, pero asegurar consistencia)
+    col_ps = ['POBTOTAL','VIVTOTAL','densidad_pob','NOMCCPP']
+    inei_2017_df = df_ps.copy()
+    df_ps = df_ps.drop(columns=col_ps, errors='ignore')  
+    col_ps.append('centropoblado')
+    inei_2017_df = inei_2017_df[col_ps].rename(columns={"centropoblado": "ubigeo_ccpp"})
     inei_2017_df['ubigeo_ccpp'] = inei_2017_df['ubigeo_ccpp'].astype(str)
     inei_2017_df['POBTOTAL'] = pd.to_numeric(inei_2017_df['POBTOTAL'], errors='coerce').fillna(0)
     inei_2017_df['VIVTOTAL'] = pd.to_numeric(inei_2017_df['VIVTOTAL'], errors='coerce').fillna(0)
     inei_2017_df['densidad_pob'] = pd.to_numeric(inei_2017_df['densidad_pob'], errors='coerce').fillna(0)
-    if 'ambito_ccpp' not in inei_2017_df.columns: # Calcular si no viene de la BD INEI
-        inei_2017_df['ambito_ccpp'] = inei_2017_df['POBTOTAL'].apply(lambda x: 'Rural' if x <= 2000 else ('Pequeña Ciudad' if x <= 15000 else 'Urbano'))
+    inei_2017_df['ambito_ccpp'] = inei_2017_df['POBTOTAL'].apply(lambda x: 'Rural' if x <= 2000 else ('Pequeña Ciudad' if x <= 15000 else 'Urbano'))
+    # if 'ambito_ccpp' not in inei_2017_df.columns: # Calcular si no viene de la BD INEI
+    #     inei_2017_df['ambito_ccpp'] = inei_2017_df['POBTOTAL'].apply(lambda x: 'Rural' if x <= 2000 else ('Pequeña Ciudad' if x <= 15000 else 'Urbano'))
     
     logger.info("Limpieza de tipos de datos completada.")
 
@@ -199,7 +205,6 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
     # Es crucial que df_prestador_final tenga todas las columnas que esperan estas funciones.
     # df_ps ya está filtrado para el prestador_id_codigo
     # df_fuente ya está filtrado para el prestador_id_codigo
-    
     ctx_dg, df_prep_prestador, df_prep_ps, df_prep_fuente = \
         preparar_datos_generales_y_poblacion(df_prestador_final, inei_2017_df, df_ps, df_fuente)
     context_final.update(ctx_dg)

@@ -317,9 +317,18 @@ def obtener_df_prestador_simple_dataverse(codigo_prestador, campos_ps_select, no
     """Obtiene información de Población Servida (PS) para un prestador."""
     token = get_dataverse_token()
     prestador_guid = obtener_prestador_id_dataverse(codigo_prestador)
+    nueva_column_ccpp = [
+        "cr217_nombredecentropoblado",
+        "cr217_poblaciontotaldelcentropoblado",
+        "cr217_viviendastotalesdelcentropoblado",
+        "cr217_densidadpoblacional"
+    ]
+    nueva_column_ccpp_formattes = [
+        "NOMCCPP","POBTOTAL","VIVTOTAL","densidad_pob"
+    ]
     if not prestador_guid:
         print(f"Error: No se encontró GUID para el prestador {codigo_prestador} (Población Servida).")
-        return pd.DataFrame(columns=["codigodeprestador", "centropoblado"] + nombres_columnas_ps_df)
+        return pd.DataFrame(columns=["codigodeprestador", "centropoblado"] + nombres_columnas_ps_df + nueva_column_ccpp_formattes)
 
     # La propiedad de navegación para Población Servida (PS)
     # y la anidada para Centro Poblado.
@@ -329,20 +338,23 @@ def obtener_df_prestador_simple_dataverse(codigo_prestador, campos_ps_select, no
     prop_nav_ps = "cr217_Prestador_cr217_Prestador_cr217_Pob"
     prop_nav_ccpp_en_ps = "cr217_Centropoblado"
     campo_codigo_ccpp = "cr217_codigodecentropoblado"
+
+    nueva_column_ccpp += [campo_codigo_ccpp]
     
     select_ps_str = ",".join(campos_ps_select)
+    select_ccpp_str = ",".join(nueva_column_ccpp)
     
     url = (
         f"{config.RESOURCE_DATAVERSE}/api/data/v9.2/cr217_prestadors({prestador_guid})"
         f"?$select=cr217_codigodeprestador"  # Solo necesitamos el código del prestador aquí como referencia
-        f"&$expand={prop_nav_ps}($select={select_ps_str};$expand={prop_nav_ccpp_en_ps}($select={campo_codigo_ccpp}))"
+        f"&$expand={prop_nav_ps}($select={select_ps_str};$expand={prop_nav_ccpp_en_ps}($select={select_ccpp_str}))"
     )
 
     try:
         data_respuesta = _make_dataverse_request(url, token)
     except Exception as e:
         print(f"Error al obtener PS para prestador {codigo_prestador}: {e}")
-        return pd.DataFrame(columns=["codigodeprestador", "centropoblado"] + nombres_columnas_ps_df)
+        return pd.DataFrame(columns=["codigodeprestador", "centropoblado"] + nombres_columnas_ps_df + nueva_column_ccpp_formattes)
 
     registros_ps_list = []
     datos_ps_list = data_respuesta.get(prop_nav_ps, [])
@@ -358,6 +370,12 @@ def obtener_df_prestador_simple_dataverse(codigo_prestador, campos_ps_select, no
         
         # Extraer código del centro poblado anidado
         ccpp_info = item_ps_dataverse.get(prop_nav_ccpp_en_ps, {})
+        
+        for i, campo_orig_ccpp in enumerate(nueva_column_ccpp):
+            col_nombre_ps_df = nueva_column_ccpp_formattes[i] if i < len(nueva_column_ccpp_formattes) else campo_orig_ccpp
+            formatted_val_key_ps = f"{campo_orig_ccpp}@OData.Community.Display.V1.FormattedValue"
+            fila_ps_dict[col_nombre_ps_df] = ccpp_info.get(formatted_val_key_ps, ccpp_info.get(campo_orig_ccpp, pd.NA))
+
         codigo_ccpp_val = ccpp_info.get(campo_codigo_ccpp, pd.NA)
         # Dataverse puede devolver el valor formateado también para el código del CCPP si es un lookup formateado
         formatted_ccpp_key = f"{campo_codigo_ccpp}@OData.Community.Display.V1.FormattedValue"
@@ -368,7 +386,7 @@ def obtener_df_prestador_simple_dataverse(codigo_prestador, campos_ps_select, no
         registros_ps_list.append(fila_ps_dict)
 
     if not registros_ps_list:
-        return pd.DataFrame(columns=["codigodeprestador", "centropoblado"] + nombres_columnas_ps_df)
+        return pd.DataFrame(columns=["codigodeprestador", "centropoblado"] + nombres_columnas_ps_df + nueva_column_ccpp_formattes)
         
     return pd.DataFrame(registros_ps_list)
 

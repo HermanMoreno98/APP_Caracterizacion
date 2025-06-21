@@ -121,7 +121,6 @@ def preparar_datos_generales_y_poblacion(df_prestador_actual, inei_2017_df, df_p
         inei_2017_df_copy = inei_2017_df.copy()
         df_ps_actual_copy['centropoblado_str'] = df_ps_actual_copy['centropoblado'].astype(str)
         inei_2017_df_copy['ubigeo_ccpp_str'] = inei_2017_df_copy['ubigeo_ccpp'].astype(str)
-        
         df_ps_procesado = pd.merge(df_ps_actual_copy, inei_2017_df_copy, left_on='centropoblado_str', right_on='ubigeo_ccpp_str', how='inner')
         
         if not df_ps_procesado.empty:
