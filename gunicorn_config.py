@@ -5,6 +5,6 @@ timeout = 600
 worker_class = "sync"
 accesslog = "-"
 errorlog = "-"
-worker_tmp_dir = "/dev/shm"
+worker_tmp_dir = "/tmp"
 max_requests = 1000
 max_requests_jitter = 50 
