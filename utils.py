@@ -127,3 +127,7 @@ def obtener_valor_o_defecto(serie, defecto='-'):
     if not serie.empty and pd.notna(serie.iloc[0]):
         return serie.iloc[0]
     return defecto
+
+
+def generar_rutafichas(codigoname,codigoid):
+    return 'https://sunassgobpe.sharepoint.com/sites/adp2/cr217_prestador/Forms/AllItems.aspx?id=%2Fsites%2Fadp2%2Fcr217_prestador%2F' + codigoname+'_'+codigoid.replace('-', '') + '%2FFICHAS&viewid=589d0427-4c8e-4a99-aa86-36052f289f8d'

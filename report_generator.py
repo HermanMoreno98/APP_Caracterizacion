@@ -1,10 +1,10 @@
 import pandas as pd
-from docxtpl import DocxTemplate 
+from docxtpl import DocxTemplate, RichText
 import os
 from functools import reduce 
 
 import config
-from utils import limpiar_y_convertir 
+from utils import limpiar_y_convertir , generar_rutafichas
 from data_preparation import *
 from dataverse_api import *
 from sharepoint_api import *
@@ -95,20 +95,20 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
     # ruta_inei_local = get_bd_inei_sharepoint(config.DIR_BD_TEMP)
     # inei_2017_df = pd.read_excel(ruta_inei_local, sheet_name="CCPP") # Asegúrate del nombre de la hoja
     
-    # guid_prestador_dv = _get_value(df_prestador, 'prestadorid', None)
-    # ruta_fotos_locales_prestador = None
-    # if guid_prestador_dv:
-    #     nombre_carpeta_sp = f"{prestador_id_codigo}_{guid_prestador_dv.replace('-', '')}"
-    #     logger.info(f"Intentando descargar archivos de SharePoint para la carpeta: {nombre_carpeta_sp}")
-    #     descarga_exitosa = download_prestador_files_sharepoint(nombre_carpeta_sp, ruta_base_archivos_sp_descargados)
-    #     if descarga_exitosa:
-    #         ruta_fotos_locales_prestador = os.path.join(ruta_base_archivos_sp_descargados, nombre_carpeta_sp)
-    #         logger.info(f"Archivos de SharePoint descargados (o intento realizado) en: {ruta_fotos_locales_prestador}")
-    #     else:
-    #         logger.warning(f"No se pudieron descargar archivos para {prestador_id_codigo} desde SharePoint (carpeta: {nombre_carpeta_sp}).")
-    # else:
-    #     logger.error(f"No se pudo obtener el GUID del prestador {prestador_id_codigo} para descargas de SharePoint.")
-    # logger.info("Descarga de archivos de SharePoint completada (o intento realizado).")
+    guid_prestador_dv = _get_value(df_prestador, 'prestadorid', None)
+    ruta_fotos_locales_prestador = None
+    if guid_prestador_dv:
+        nombre_carpeta_sp = f"{prestador_id_codigo}_{guid_prestador_dv.replace('-', '')}"
+        logger.info(f"Intentando descargar archivos de SharePoint para la carpeta: {nombre_carpeta_sp}")
+        descarga_exitosa = download_prestador_files_sharepoint(nombre_carpeta_sp, ruta_base_archivos_sp_descargados)
+        if descarga_exitosa:
+            ruta_fotos_locales_prestador = os.path.join(ruta_base_archivos_sp_descargados, nombre_carpeta_sp)
+            logger.info(f"Archivos de SharePoint descargados (o intento realizado) en: {ruta_fotos_locales_prestador}")
+        else:
+            logger.warning(f"No se pudieron descargar archivos para {prestador_id_codigo} desde SharePoint (carpeta: {nombre_carpeta_sp}).")
+    else:
+        logger.error(f"No se pudo obtener el GUID del prestador {prestador_id_codigo} para descargas de SharePoint.")
+    logger.info("Descarga de archivos de SharePoint completada (o intento realizado).")
 
     # --- 3. LIMPIEZA Y TRANSFORMACIÓN DE TIPOS DE DATOS ---
     logger.info("Paso 3: Limpiando y transformando tipos de datos...")
@@ -130,7 +130,7 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
     # df_disposicionfinal_raw no parece necesitar limpieza de tipos según el original
 
     # Pre-procesar INEI (ya hecho parcialmente antes, pero asegurar consistencia)
-    col_ps = ['POBTOTAL','VIVTOTAL','densidad_pob','NOMCCPP']
+    col_ps = ['POBTOTAL','VIVTOTAL','densidad_pob','NOMCCPP','NOMDIST','NOMPROV','NOMDEP']
     inei_2017_df = df_ps.copy()
     df_ps = df_ps.drop(columns=col_ps, errors='ignore')  
     col_ps.append('centropoblado')
@@ -185,7 +185,6 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
         if 'p022_conexionesdeaguaactivas' not in df_prestador_final.columns: df_prestador_final['p022_conexionesdeaguaactivas'] = 0
         if 'p024_conexionesdealcantarilladoactivas' not in df_prestador_final.columns: df_prestador_final['p024_conexionesdealcantarilladoactivas'] = 0
     logger.info("Merges completados.")
-
     # --- 5. DETERMINAR PLANTILLA DOCX ---
     logger.info("Paso 5: Determinando plantilla DOCX...")
     plantilla_path = config.TEMPLATE_PRINCIPAL
@@ -235,46 +234,48 @@ def generar_informe_final_desde_api(prestador_id_codigo, ruta_base_archivos_sp_d
     
     logger.info("Preparación del contexto de datos completada.")
 
-    # # --- 7. MANEJAR IMÁGENES Y GRÁFICOS ---
-    # logger.info("Paso 7: Preparando imágenes y gráficos...")
-    # # Enlace a fichas
-    # rutafichas_val = _get_value(df_prep_prestador, 'rutafichas', None) # Asumiendo que esta columna existe en df_prestador_final
-    # if rutafichas_val and rutafichas_val != '-':
-    #     rt_link = RichText()
-    #     rt_link.add(rutafichas_val, url_id=doc.build_url_id(rutafichas_val))
-    #     context_final['link'] = rt_link
-    # else:
-    #     context_final['link'] = "-"
+    # --- 7. MANEJAR IMÁGENES Y GRÁFICOS ---
+    logger.info("Paso 7: Preparando imágenes y gráficos...")
+    # Enlace a fichas
+    rutafichas_val = generar_rutafichas(df_prep_prestador['codigodeprestador'].values[0],
+                                        df_prep_prestador['prestadorid'].values[0])
+    # rutafichas_val = _get_value(df_prep_prestador, 'rutafichas', None)
+    if rutafichas_val and rutafichas_val != '-':
+        rt_link = RichText()
+        rt_link.add(rutafichas_val, url_id=doc.build_url_id(rutafichas_val))
+        context_final['link'] = rt_link
+    else:
+        context_final['link'] = "-"
 
-    # # Recursos fotográficos
-    # context_final['images_matrix'] = []
-    # context_final['imageActas'] = []
-    # if ruta_fotos_locales_prestador and os.path.isdir(ruta_fotos_locales_prestador):
-    #     if guid_prestador_dv: # guid_prestador_dv ya se obtuvo antes
-    #             nombre_carpeta_sharepoint = f"{prestador_id_codigo}_{guid_prestador_dv.replace('-', '')}"
-    #             # ruta_base_archivos_sp_descargados es config.DIR_PRESTADOR_FILES
+    # Recursos fotográficos
+    context_final['images_matrix'] = []
+    context_final['imageActas'] = []
+    if ruta_fotos_locales_prestador and os.path.isdir(ruta_fotos_locales_prestador):
+        if guid_prestador_dv: # guid_prestador_dv ya se obtuvo antes
+                nombre_carpeta_sharepoint = f"{prestador_id_codigo}_{guid_prestador_dv.replace('-', '')}"
+                # ruta_base_archivos_sp_descargados es config.DIR_PRESTADOR_FILES
 
-    #             fotos_obj_list = cargar_imagenes_para_informe(
-    #                 doc, 
-    #                 ruta_base_archivos_sp_descargados, # ej. "temp_processing/cr217_prestador"
-    #                 nombre_carpeta_sharepoint,         # ej. "P-09723-D2Q3Z_2ce..."
-    #                 'FOTOS',                           # subcarpeta_fotos
-    #                 ancho_pulgadas=3
-    #             )
-    #             context_final['images_matrix'] = organizar_imagenes_matriz(fotos_obj_list, columnas=2)
+                fotos_obj_list = cargar_imagenes_para_informe(
+                    doc, 
+                    ruta_base_archivos_sp_descargados, # ej. "temp_processing/cr217_prestador"
+                    nombre_carpeta_sharepoint,         # ej. "P-09723-D2Q3Z_2ce..."
+                    'FOTOS',                           # subcarpeta_fotos
+                    ancho_pulgadas=3
+                )
+                context_final['images_matrix'] = organizar_imagenes_matriz(fotos_obj_list, columnas=2)
                 
-    #             actas_obj_list = cargar_imagenes_para_informe(
-    #                 doc, 
-    #                 ruta_base_archivos_sp_descargados, 
-    #                 nombre_carpeta_sharepoint,
-    #                 'ACTAS',                           # subcarpeta_fotos
-    #                 ancho_pulgadas=5
-    #             )
-    #             context_final['imageActas'] = actas_obj_list
-    #     else:
-    #         logger.warning(f"No se pudo determinar nombre_carpeta_sharepoint, no se cargarán imágenes para {prestador_id_codigo}")
-    # else:
-    #     logger.warning(f"No se encontraron fotos/actas locales para {prestador_id_codigo} en {ruta_fotos_locales_prestador}")
+                actas_obj_list = cargar_imagenes_para_informe(
+                    doc, 
+                    ruta_base_archivos_sp_descargados, 
+                    nombre_carpeta_sharepoint,
+                    'ACTAS',                           # subcarpeta_fotos
+                    ancho_pulgadas=5
+                )
+                context_final['imageActas'] = actas_obj_list
+        else:
+            logger.warning(f"No se pudo determinar nombre_carpeta_sharepoint, no se cargarán imágenes para {prestador_id_codigo}")
+    else:
+        logger.warning(f"No se encontraron fotos/actas locales para {prestador_id_codigo} en {ruta_fotos_locales_prestador}")
 
     # Gráficos
     # (Asegúrate que plot_generator guarde en config.DIR_GRAPHS)

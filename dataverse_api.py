@@ -321,10 +321,11 @@ def obtener_df_prestador_simple_dataverse(codigo_prestador, campos_ps_select, no
         "cr217_nombredecentropoblado",
         "cr217_poblaciontotaldelcentropoblado",
         "cr217_viviendastotalesdelcentropoblado",
-        "cr217_densidadpoblacional"
+        "cr217_densidadpoblacional",
+        "cr217_distrito","cr217_provincia","cr217_departamento"
     ]
     nueva_column_ccpp_formattes = [
-        "NOMCCPP","POBTOTAL","VIVTOTAL","densidad_pob"
+        "NOMCCPP","POBTOTAL","VIVTOTAL","densidad_pob","NOMDIST","NOMPROV","NOMDEP"
     ]
     if not prestador_guid:
         print(f"Error: No se encontró GUID para el prestador {codigo_prestador} (Población Servida).")

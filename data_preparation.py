@@ -797,13 +797,13 @@ def preparar_sistemas_agua(df_prestador_actual, df_sistema_agua_actual, df_capta
     if not df_sistema_agua_resumen.empty:
         df_sistema_agua_resumen['N_group'] = df_sistema_agua_resumen.groupby('tipodesistemadeagua', dropna=False).cumcount() + 1
         df_sistema_agua_resumen['num'] = df_sistema_agua_resumen.apply(lambda r: f"S{r['N_group']}", axis=1)
-
         # Merge cloro residual del reservorio
         if not df_reservorio_proc.empty and 'clororesidualmgl' in df_reservorio_proc.columns and \
             not pd.api.types.is_string_dtype(df_reservorio_proc['clororesidualmgl']):
-            df_res_cloro = df_reservorio_proc.groupby('codigodesistemadeagua')['clororesidualmgl'].mean().reset_index()
-            df_res_cloro['clororesidualmgl'] = df_res_cloro['clororesidualmgl'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "-")
-            df_sistema_agua_resumen = pd.merge(df_sistema_agua_resumen, df_res_cloro, on='codigodesistemadeagua', how='left')
+                df_reservorio_proc['clororesidualmgl'] = pd.to_numeric(df_reservorio_proc['clororesidualmgl'], errors='coerce')
+                df_res_cloro = df_reservorio_proc.groupby('codigodesistemadeagua')['clororesidualmgl'].mean().reset_index()
+                df_res_cloro['clororesidualmgl'] = df_res_cloro['clororesidualmgl'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "-")
+                df_sistema_agua_resumen = pd.merge(df_sistema_agua_resumen, df_res_cloro, on='codigodesistemadeagua', how='left')
         else:
             df_sistema_agua_resumen['clororesidualmgl'] = "-"
 
@@ -915,19 +915,26 @@ def preparar_sistemas_agua(df_prestador_actual, df_sistema_agua_actual, df_capta
     
     # Limpiar coordenadas_agua_list de duplicados por nombre y convertir a valores finales
     final_coordenadas_agua = []
-    seen_coords_agua_nombres = set()
+    seen_coords_agua = set()
+
     for coord_dict_raw in coordenadas_agua_list_raw:
-        nombre_coord_raw = coord_dict_raw.get("nombre")
-        if nombre_coord_raw not in seen_coords_agua_nombres and pd.notna(coord_dict_raw.get("este")): # Solo si tiene este y no se ha visto
-            final_coordenadas_agua.append({
-                "nombre": str(nombre_coord_raw) if pd.notna(nombre_coord_raw) else "-", 
-                "zona": str(coord_dict_raw.get("zona")) if pd.notna(coord_dict_raw.get("zona")) else "-",
-                "este": formatear_valor(coord_dict_raw.get("este")), 
-                "norte": formatear_valor(coord_dict_raw.get("norte")),
-                "altitud": formatear_valor(coord_dict_raw.get("altitud"))
-            })
-            if pd.notna(nombre_coord_raw):
-                seen_coords_agua_nombres.add(nombre_coord_raw)
+        nombre = coord_dict_raw.get("nombre")
+        este = coord_dict_raw.get("este")
+        norte = coord_dict_raw.get("norte")
+
+        # Solo si tiene coordenadas válidas
+        if pd.notna(este) and pd.notna(norte):
+            key = (nombre, este, norte)
+            if key not in seen_coords_agua:
+                final_coordenadas_agua.append({
+                    "nombre": str(nombre) if pd.notna(nombre) else "-", 
+                    "zona": str(coord_dict_raw.get("zona")) if pd.notna(coord_dict_raw.get("zona")) else "-",
+                    "este": formatear_valor(este), 
+                    "norte": formatear_valor(norte),
+                    "altitud": formatear_valor(coord_dict_raw.get("altitud"))
+                })
+                seen_coords_agua.add(key)
+
     logger.info("Preparación de sistemas de agua completada.")
     return context_agua, final_coordenadas_agua
 
@@ -1112,28 +1119,40 @@ def preparar_sistemas_alcantarillado_ptar_ubs(
     # --- Coordenadas Totales (Combinar y Formatear) ---
     logger.debug("Combinando y formateando coordenadas finales...")
     coordenadas_finales_list_fmt = []
-    seen_coords_final_nombres = set() # Para evitar duplicados por nombre en la lista final
-    
-    # Primero las de agua (ya vienen formateadas de la función anterior)
+    seen_coords_final = set()  # Para evitar duplicados por (nombre, este, norte)
+
+    # Primero las de agua (ya vienen formateadas)
     for coord_agua in coordenadas_agua_list_preformateadas:
-        nombre_coord = coord_agua.get("nombre")
-        if nombre_coord and nombre_coord != "-" and nombre_coord not in seen_coords_final_nombres:
-            coordenadas_finales_list_fmt.append(coord_agua)
-            seen_coords_final_nombres.add(nombre_coord)
-            
-    # Luego las de saneamiento (EBAR, PTAR - necesitan formateo)
+        nombre = coord_agua.get("nombre")
+        este = coord_agua.get("este")
+        norte = coord_agua.get("norte")
+
+        if nombre and nombre != "-" and este and norte:
+            key = (nombre, este, norte)
+            if key not in seen_coords_final:
+                coordenadas_finales_list_fmt.append(coord_agua)
+                seen_coords_final.add(key)
+
+    # Luego las de saneamiento (necesitan formateo)
     for coord_san_raw in coordenadas_saneamiento_list_raw:
-        nombre_coord_san = coord_san_raw.get("nombre")
-        if nombre_coord_san and nombre_coord_san != "-" and nombre_coord_san not in seen_coords_final_nombres:
-            coordenadas_finales_list_fmt.append({
-                "nombre": str(nombre_coord_san), 
-                "zona": str(coord_san_raw.get("zona", "-")),
-                "este": formatear_valor(coord_san_raw.get("este")), 
-                "norte": formatear_valor(coord_san_raw.get("norte")),
-                "altitud": formatear_valor(coord_san_raw.get("altitud"))
-            })
-            seen_coords_final_nombres.add(nombre_coord_san)
-            
+        nombre = coord_san_raw.get("nombre")
+        este = formatear_valor(coord_san_raw.get("este"))
+        norte = formatear_valor(coord_san_raw.get("norte"))
+        altitud = formatear_valor(coord_san_raw.get("altitud"))
+        zona = str(coord_san_raw.get("zona", "-"))
+
+        if nombre and nombre != "-" and este and norte:
+            key = (nombre, este, norte)
+            if key not in seen_coords_final:
+                coordenadas_finales_list_fmt.append({
+                    "nombre": str(nombre),
+                    "zona": zona,
+                    "este": este,
+                    "norte": norte,
+                    "altitud": altitud
+                })
+                seen_coords_final.add(key)
+
     context_saneamiento['coordenadas'] = coordenadas_finales_list_fmt
     logger.info("Preparación de sistemas de alcantarillado, PTAR y UBS completada.")
     return context_saneamiento
